@@ -4,6 +4,9 @@ import 'firebase_options.dart';
 import 'package:provider/provider.dart';
 import 'providers/task_provider.dart';
 import 'screens/home_screen.dart';
+import 'screens/login_screen.dart';
+import 'services/auth_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,10 +22,13 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Task Manager',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(primarySwatch: Colors.blue),
-      home: HomeScreen(),
+      home: StreamBuilder<User?>(
+        stream: AuthService().userStream,
+        builder: (context, snapshot) {
+          if (snapshot.hasData) return HomeScreen(uid: snapshot.data!.uid);
+          return LoginScreen();
+        },
+      ),
     );
   }
 }

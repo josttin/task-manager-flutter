@@ -4,10 +4,15 @@ import '../models/task_model.dart';
 class DatabaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  // Obtener tareas en tiempo real
-  Stream<List<TaskModel>> getTasks() {
-    return _db
-        .collection('tasks')
+  // Stream dinámico: Si es jefe ve todo, si es empleado solo sus tareas
+  Stream<List<TaskModel>> getTasks(String uid, String role) {
+    Query query = _db.collection('tasks');
+
+    if (role == 'empleado') {
+      query = query.where('userId', isEqualTo: uid);
+    }
+
+    return query
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map(
@@ -16,12 +21,12 @@ class DatabaseService {
         );
   }
 
-  // Agregar nueva tarea
-  Future<void> addTask(String title) async {
+  Future<void> addTask(String title, String uid) async {
     await _db.collection('tasks').add({
       'title': title,
       'isDone': false,
       'createdAt': FieldValue.serverTimestamp(),
+      'userId': uid, // Guardamos quién la creó
     });
   }
 
