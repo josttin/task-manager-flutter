@@ -21,12 +21,15 @@ class DatabaseService {
         );
   }
 
-  Future<void> addTask(String title, String uid) async {
+  Future<void> addTask(String title, String uid, {DateTime? dueDate}) async {
     await _db.collection('tasks').add({
       'title': title,
+      'userId': uid,
       'isDone': false,
       'createdAt': FieldValue.serverTimestamp(),
-      'userId': uid, // Guardamos quién la creó
+      'dueDate': dueDate != null
+          ? Timestamp.fromDate(dueDate)
+          : null, // Agregar esto
     });
   }
 

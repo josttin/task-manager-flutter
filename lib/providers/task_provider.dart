@@ -23,9 +23,10 @@ class TaskProvider with ChangeNotifier {
     return _dbService.getTasks(_userData!.uid, _userData!.role);
   }
 
-  Future<void> addTask(String title) async {
+  Future<void> addTask(String title, {DateTime? dueDate}) async {
     if (_userData != null) {
-      await _dbService.addTask(title, _userData!.uid);
+      // Pasar dueDate al servicio
+      await _dbService.addTask(title, _userData!.uid, dueDate: dueDate);
     }
   }
 
