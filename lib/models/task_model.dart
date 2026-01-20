@@ -1,22 +1,24 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class TaskModel {
-  String id;
-  String title;
-  bool isDone;
-  DateTime createdAt;
-  String userId;
-  String priority; // 'Baja', 'Media', 'Alta'
-  DateTime? dueDate;
+  final String id;
+  final String title;
+  final String description; // Nuevo
+  final String userId;
+  final bool isDone;
+  final DateTime dueDate; // Ahora no es opcional
+  final String assignedTo;
+  final String assignedToName;
 
   TaskModel({
     required this.id,
     required this.title,
-    this.isDone = false,
-    required this.createdAt,
+    required this.description,
     required this.userId,
-    this.priority = 'Media',
-    this.dueDate,
+    required this.isDone,
+    required this.dueDate,
+    required this.assignedTo,
+    required this.assignedToName,
   });
 
   factory TaskModel.fromSnapshot(DocumentSnapshot snap) {
@@ -24,22 +26,22 @@ class TaskModel {
     return TaskModel(
       id: snap.id,
       title: data['title'] ?? '',
-      isDone: data['isDone'] ?? false,
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
+      description: data['description'] ?? '',
       userId: data['userId'] ?? '',
-      priority: data['priority'] ?? 'Media',
-      dueDate: data['dueDate'] != null
-          ? (data['dueDate'] as Timestamp).toDate()
-          : null,
+      isDone: data['isDone'] ?? false,
+      dueDate: (data['dueDate'] as Timestamp).toDate(),
+      assignedTo: data['assignedTo'] ?? '',
+      assignedToName: data['assignedToName'] ?? '',
     );
   }
 
   Map<String, dynamic> toJson() => {
     "title": title,
-    "isDone": isDone,
-    "createdAt": createdAt,
+    "description": description,
     "userId": userId,
-    "priority": priority,
-    "dueDate": dueDate,
+    "isDone": isDone,
+    "dueDate": Timestamp.fromDate(dueDate),
+    "assignedTo": assignedTo,
+    "assignedToName": assignedToName,
   };
 }

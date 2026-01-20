@@ -1,40 +1,51 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../models/task_model.dart';
-import '../models/user_model.dart';
 import '../services/database_service.dart';
-import '../services/auth_service.dart';
 
 class TaskProvider with ChangeNotifier {
   final DatabaseService _dbService = DatabaseService();
-  final AuthService _authService = AuthService();
-  UserModel? _userData;
+  Map<String, dynamic>? _userData; // Cambiado a Map explícitamente
 
-  UserModel? get userData => _userData;
-
-  // Cargar datos del usuario al iniciar
-  Future<void> loadUser(String uid) async {
-    _userData = await _authService.getUserData(uid);
-    notifyListeners();
-  }
+  Map<String, dynamic>? get userData => _userData;
 
   Stream<List<TaskModel>> get tasksStream {
     if (_userData == null) return const Stream.empty();
-    return _dbService.getTasks(_userData!.uid, _userData!.role);
+    // CORRECCIÓN: Usar ['uid'] y ['role']
+    return _dbService.getTasks(_userData!['uid'], _userData!['role']);
   }
 
-  Future<void> addTask(String title, {DateTime? dueDate}) async {
+  void loadUser(String uid) async {
+    final data = await _dbService.getUserData(uid);
+    if (data != null) {
+      _userData = data;
+      notifyListeners();
+    }
+  }
+
+  Future<void> addTask(
+    String title, {
+    required String description,
+    required DateTime dueDate,
+    required String assignedTo,
+    required String assignedToName,
+  }) async {
     if (_userData != null) {
-      // Pasar dueDate al servicio
-      await _dbService.addTask(title, _userData!.uid, dueDate: dueDate);
+      await _dbService.addTask(
+        title: title,
+        description: description,
+        creatorUid: _userData!['uid'], // CORRECCIÓN: ['uid']
+        dueDate: dueDate,
+        assignedTo: assignedTo,
+        assignedToName: assignedToName,
+      );
     }
   }
 
   Future<void> toggleTask(TaskModel task) async {
-    await _dbService.toggleTask(task);
+    await _dbService.updateTaskStatus(task.id, !task.isDone);
   }
 
-  Future<void> deleteTask(String id) async {
-    await _dbService.deleteTask(id);
+  Future<void> deleteTask(String taskId) async {
+    await _dbService.deleteTask(taskId);
   }
 }
