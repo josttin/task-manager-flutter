@@ -49,7 +49,6 @@ class _HomeScreenState extends State<HomeScreen> {
             right: 20,
           ),
           decoration: const BoxDecoration(
-            // Fondo sólido y oscuro para el modal (Mejor contraste)
             color: Color(0xFF101820),
             borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
           ),
@@ -125,27 +124,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   onPressed: () {
                     if (_titleController.text.isEmpty ||
-                        _descController.text.isEmpty ||
-                        _selectedDate == null ||
-                        _selectedEmployeeId == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text("Completa todos los campos"),
-                        ),
-                      );
+                        _selectedEmployeeId == null)
                       return;
-                    }
                     provider.addTask(
-                      _titleController.text,
+                      title: _titleController.text,
                       description: _descController.text,
-                      dueDate: _selectedDate!,
+                      dueDate: _selectedDate ?? DateTime.now(),
                       assignedTo: _selectedEmployeeId!,
                       assignedToName: _selectedEmployeeName!,
                     );
                     _titleController.clear();
                     _descController.clear();
-                    _selectedDate = null;
-                    _selectedEmployeeId = null;
                     Navigator.pop(context);
                   },
                   child: const Text(
@@ -173,7 +162,6 @@ class _HomeScreenState extends State<HomeScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
     final String role = user['role'] ?? 'empleado';
-    // Colores de fondo más profundos para que el "Glass" resalte
     final List<Color> bgColors = role == 'jefe'
         ? [const Color(0xFF0D1B2A), const Color(0xFF1B263B)]
         : [const Color(0xFF002117), const Color(0xFF004433)];
@@ -186,7 +174,6 @@ class _HomeScreenState extends State<HomeScreen> {
           style: const TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
-            letterSpacing: 1.1,
           ),
         ),
         elevation: 0,
@@ -235,7 +222,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       _buildProgressHeader(allTasks),
                       _buildSearchBar(),
                       const SizedBox(height: 15),
-                      _buildFilterSection(),
+                      _buildFilterSection(role),
                       const Divider(color: Colors.white12, height: 30),
                       Expanded(
                         child: _buildAnimatedTaskList(
@@ -254,8 +241,83 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // --- COMPONENTES UI MEJORADOS ---
+  Widget _buildFilterSection(String role) {
+    // El jefe tiene el filtro de "Revisión" adicional
+    List<String> filters = role == 'jefe'
+        ? ['Todas', 'Pendientes', 'Revisión', 'Hechas']
+        : ['Todas', 'Pendientes', 'Hechas'];
 
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: filters.map((f) {
+          bool isSelected = _filter == f;
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: ChoiceChip(
+              label: Text(f),
+              selected: isSelected,
+              onSelected: (s) => setState(() => _filter = f),
+              selectedColor: f == 'Revisión'
+                  ? Colors.orangeAccent
+                  : Colors.greenAccent,
+              backgroundColor: Colors.black45,
+              labelStyle: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: isSelected ? Colors.black : Colors.white70,
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildAnimatedTaskList(
+    List<TaskModel> allTasks,
+    ConnectionState state,
+  ) {
+    if (state == ConnectionState.waiting)
+      return const Center(
+        child: CircularProgressIndicator(color: Colors.greenAccent),
+      );
+
+    var tasks = allTasks.where((t) {
+      bool matchesSearch = t.title.toLowerCase().contains(_searchQuery);
+      if (_filter == 'Todas') return matchesSearch;
+      if (_filter == 'Pendientes')
+        return matchesSearch && t.status == 'pendiente';
+      if (_filter == 'Revisión') return matchesSearch && t.status == 'revision';
+      if (_filter == 'Hechas') return matchesSearch && t.status == 'completada';
+      return matchesSearch;
+    }).toList();
+
+    if (tasks.isEmpty)
+      return const Center(
+        child: Text(
+          "No hay tareas aquí",
+          style: TextStyle(color: Colors.white38),
+        ),
+      );
+
+    return AnimationLimiter(
+      child: ListView.builder(
+        padding: const EdgeInsets.only(bottom: 100),
+        itemCount: tasks.length,
+        itemBuilder: (context, index) => AnimationConfiguration.staggeredList(
+          position: index,
+          duration: const Duration(milliseconds: 500),
+          child: FadeInAnimation(
+            child: ScaleAnimation(child: TaskTile(task: tasks[index])),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- MANTENEMOS LOS DEMÁS WIDGETS AUXILIARES (SearchBar, Progress, ModalField, etc) ---
   Widget _buildModalField(
     TextEditingController ctrl,
     String hint,
@@ -351,6 +413,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildSearchBar() {
     return Container(
+      margin: const EdgeInsets.only(top: 10),
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.3),
         borderRadius: BorderRadius.circular(30),
@@ -370,32 +433,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildFilterSection() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: ['Todas', 'Pendientes', 'Hechas'].map((f) {
-        bool isSelected = _filter == f;
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: ChoiceChip(
-            label: Text(f),
-            selected: isSelected,
-            onSelected: (s) => setState(() => _filter = f),
-            selectedColor: Colors.greenAccent,
-            backgroundColor: Colors.black45,
-            labelStyle: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: isSelected ? Colors.black : Colors.white70,
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
   Widget _buildProgressHeader(List<TaskModel> tasks) {
-    final completed = tasks.where((t) => t.isDone).length;
+    final completed = tasks.where((t) => t.status == 'completada').length;
     final total = tasks.length;
     final percent = total > 0 ? completed / total : 0.0;
     return Padding(
@@ -406,7 +445,7 @@ class _HomeScreenState extends State<HomeScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                "Cumplimiento",
+                "Progreso General",
                 style: TextStyle(color: Colors.white70, fontSize: 13),
               ),
               Text(
@@ -428,37 +467,6 @@ class _HomeScreenState extends State<HomeScreen> {
             borderRadius: BorderRadius.circular(10),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildAnimatedTaskList(
-    List<TaskModel> allTasks,
-    ConnectionState state,
-  ) {
-    if (state == ConnectionState.waiting)
-      return const Center(
-        child: CircularProgressIndicator(color: Colors.greenAccent),
-      );
-
-    var tasks = allTasks.where((t) {
-      bool matchesFilter =
-          _filter == 'Todas' ||
-          (_filter == 'Pendientes' ? !t.isDone : t.isDone);
-      return matchesFilter && t.title.toLowerCase().contains(_searchQuery);
-    }).toList();
-
-    return AnimationLimiter(
-      child: ListView.builder(
-        padding: const EdgeInsets.only(bottom: 100),
-        itemCount: tasks.length,
-        itemBuilder: (context, index) => AnimationConfiguration.staggeredList(
-          position: index,
-          duration: const Duration(milliseconds: 500),
-          child: FadeInAnimation(
-            child: ScaleAnimation(child: TaskTile(task: tasks[index])),
-          ),
-        ),
       ),
     );
   }
