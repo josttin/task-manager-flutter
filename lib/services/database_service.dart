@@ -18,28 +18,6 @@ class DatabaseService {
     return null;
   }
 
-  Stream<List<TaskModel>> getTasks(String uid, String role) {
-    // Quita el .orderBy por ahora para probar
-    if (role == 'jefe') {
-      return _db
-          .collection('tasks')
-          .snapshots()
-          .map(
-            (snap) =>
-                snap.docs.map((doc) => TaskModel.fromSnapshot(doc)).toList(),
-          );
-    } else {
-      return _db
-          .collection('tasks')
-          .where('assignedTo', isEqualTo: uid)
-          .snapshots()
-          .map(
-            (snap) =>
-                snap.docs.map((doc) => TaskModel.fromSnapshot(doc)).toList(),
-          );
-    }
-  }
-
   Stream<List<Map<String, dynamic>>> getEmployees() {
     return _db
         .collection('users')
@@ -59,6 +37,46 @@ class DatabaseService {
         });
   }
 
+  Stream<List<TaskModel>> getTasks(String uid, String role) {
+    Query query = _db.collection('tasks');
+
+    if (role != 'jefe') {
+      query = query.where('assignedTo', isEqualTo: uid);
+    }
+
+    return query.snapshots().map((snap) {
+      List<TaskModel> tasks = snap.docs
+          .map((doc) => TaskModel.fromSnapshot(doc))
+          .toList();
+
+      // --- ORDENAMIENTO LÓGICO ---
+      tasks.sort((a, b) {
+        // 1. Priorizar Anclados (Pinned)
+        if (a.isPinned && !b.isPinned) return -1;
+        if (!a.isPinned && b.isPinned) return 1;
+
+        // 2. Por Estado (Pendientes y Revisión primero que Completadas)
+        if (a.status != 'completada' && b.status == 'completada') return -1;
+        if (a.status == 'completada' && b.status != 'completada') return 1;
+
+        // 3. Por Prioridad (Alta > Media > Baja)
+        int priorityA = a.priority == TaskPriority.alta
+            ? 0
+            : (a.priority == TaskPriority.media ? 1 : 2);
+        int priorityB = b.priority == TaskPriority.alta
+            ? 0
+            : (b.priority == TaskPriority.media ? 1 : 2);
+        if (priorityA != priorityB) return priorityA.compareTo(priorityB);
+
+        // 4. Por Fecha de vencimiento
+        return a.dueDate.compareTo(b.dueDate);
+      });
+
+      return tasks;
+    });
+  }
+
+  // Actualizamos el addTask para que incluya los nuevos campos por defecto
   Future<void> addTask({
     required String title,
     required String description,
@@ -66,6 +84,7 @@ class DatabaseService {
     required DateTime dueDate,
     required String assignedTo,
     required String assignedToName,
+    String priority = 'media', // Nuevo
   }) async {
     await _db.collection('tasks').add({
       'title': title,
@@ -76,6 +95,10 @@ class DatabaseService {
       'dueDate': Timestamp.fromDate(dueDate),
       'assignedTo': assignedTo,
       'assignedToName': assignedToName,
+      'status': 'pendiente',
+      'priority': priority,
+      'isPinned': false,
+      'progressLogs': [],
     });
   }
 

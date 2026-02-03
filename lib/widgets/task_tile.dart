@@ -2,11 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/task_model.dart';
 import '../providers/task_provider.dart';
+import '../services/report_service.dart'; // Importante
 import 'package:intl/intl.dart';
 
 class TaskTile extends StatelessWidget {
   final TaskModel task;
   const TaskTile({super.key, required this.task});
+
+  Color _getPriorityColor(TaskPriority priority) {
+    switch (priority) {
+      case TaskPriority.alta:
+        return Colors.redAccent;
+      case TaskPriority.media:
+        return Colors.orangeAccent;
+      case TaskPriority.baja:
+        return Colors.blueAccent;
+    }
+  }
 
   Color _getDateColor(DateTime date) {
     if (date.isBefore(DateTime.now().subtract(const Duration(days: 1)))) {
@@ -15,134 +27,91 @@ class TaskTile extends StatelessWidget {
     return Colors.greenAccent;
   }
 
-  // --- DIÁLOGO DE RECHAZO PARA EL JEFE ---
-  void _showRejectDialog(BuildContext context, TaskProvider provider) {
-    final TextEditingController reasonController = TextEditingController();
+  void _showProgressDialog(BuildContext context, TaskProvider provider) {
+    final TextEditingController progressController = TextEditingController();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF310D0D),
+        backgroundColor: const Color(0xFF0D47A1),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text(
-          "Rechazar Tarea",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          "Registrar Avance",
+          style: TextStyle(color: Colors.white),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              "Explica el motivo del rechazo:",
-              style: TextStyle(color: Colors.white70, fontSize: 14),
-            ),
-            const SizedBox(height: 15),
-            TextField(
-              controller: reasonController,
-              maxLines: 3,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: Colors.white10,
-                hintText: "Ej: No se limpió el área correctamente...",
-                hintStyle: const TextStyle(color: Colors.white30),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-          ],
+        content: TextField(
+          controller: progressController,
+          maxLines: 2,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            hintText: "Escribe qué has hecho hasta ahora...",
+            hintStyle: TextStyle(color: Colors.white30),
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text(
-              "CANCELAR",
-              style: TextStyle(color: Colors.white54),
-            ),
+            child: const Text("CANCELAR"),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
             onPressed: () {
-              if (reasonController.text.isNotEmpty) {
-                provider.rejectTask(task.id, reasonController.text);
+              if (progressController.text.isNotEmpty) {
+                provider.addTaskProgress(task.id, progressController.text);
                 Navigator.pop(context);
               }
             },
-            child: const Text(
-              "CONFIRMAR RECHAZO",
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            child: const Text("GUARDAR AVANCE"),
           ),
         ],
       ),
     );
   }
 
-  // --- DIÁLOGO DE CIERRE PARA EL EMPLEADO ---
+  void _showRejectDialog(BuildContext context, TaskProvider provider) {
+    final TextEditingController reasonController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF310D0D),
+        title: const Text(
+          "Rechazar Tarea",
+          style: TextStyle(color: Colors.white),
+        ),
+        content: TextField(
+          controller: reasonController,
+          style: const TextStyle(color: Colors.white),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => provider
+                .rejectTask(task.id, reasonController.text)
+                .then((_) => Navigator.pop(context)),
+            child: const Text("RECHAZAR"),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showCompletionDialog(BuildContext context, TaskProvider provider) {
     final TextEditingController commentController = TextEditingController();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF1A237E),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text(
           "Finalizar Tarea",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(color: Colors.white),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              "Describe brevemente qué hiciste:",
-              style: TextStyle(color: Colors.white70, fontSize: 14),
-            ),
-            const SizedBox(height: 15),
-            TextField(
-              controller: commentController,
-              maxLines: 3,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: Colors.white10,
-                hintText: "Ej: Se realizó el mantenimiento...",
-                hintStyle: const TextStyle(color: Colors.white30),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-          ],
+        content: TextField(
+          controller: commentController,
+          style: const TextStyle(color: Colors.white),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(
-              "CANCELAR",
-              style: TextStyle(color: Colors.white54),
-            ),
-          ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.greenAccent,
-            ),
-            onPressed: () {
-              if (commentController.text.isNotEmpty) {
-                provider.sendToReview(task.id, commentController.text);
-                Navigator.pop(context);
-              }
-            },
-            child: const Text(
-              "ENVIAR REPORTE",
-              style: TextStyle(
-                color: Colors.black,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            onPressed: () => provider
+                .sendToReview(task.id, commentController.text)
+                .then((_) => Navigator.pop(context)),
+            child: const Text("ENVIAR"),
           ),
         ],
       ),
@@ -153,8 +122,6 @@ class TaskTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = Provider.of<TaskProvider>(context, listen: false);
     final bool isBoss = provider.userData?['role'] == 'jefe';
-    final bool isRejected =
-        task.completionComment?.contains("RECHAZADO") ?? false;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
@@ -163,20 +130,16 @@ class TaskTile extends StatelessWidget {
           color: Colors.black.withOpacity(0.45),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: task.status == 'revision'
-                ? Colors.orangeAccent.withOpacity(0.5)
-                : isRejected
-                ? Colors.redAccent.withOpacity(0.5)
+            color: task.isPinned
+                ? Colors.blueAccent.withOpacity(0.5)
                 : Colors.white.withOpacity(0.1),
+            width: task.isPinned ? 2 : 1,
           ),
         ),
         child: Column(
           children: [
             ListTile(
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 15,
-                vertical: 10,
-              ),
+              contentPadding: const EdgeInsets.fromLTRB(15, 5, 5, 5),
               leading: isBoss
                   ? Icon(
                       task.status == 'completada'
@@ -191,159 +154,166 @@ class TaskTile extends StatelessWidget {
                       shape: const CircleBorder(),
                       activeColor: Colors.greenAccent,
                       onChanged: (val) {
-                        if (val == true && task.status == 'pendiente') {
+                        if (val == true && task.status == 'pendiente')
                           _showCompletionDialog(context, provider);
-                        }
                       },
                     ),
-              title: Text(
-                task.title,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 17,
-                  decoration: task.status == 'completada'
-                      ? TextDecoration.lineThrough
-                      : null,
-                  color: task.status == 'completada'
-                      ? Colors.white38
-                      : Colors.white,
-                ),
+              title: Row(
+                children: [
+                  if (task.isPinned)
+                    const Icon(
+                      Icons.push_pin,
+                      size: 16,
+                      color: Colors.blueAccent,
+                    ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      task.title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        decoration: task.status == 'completada'
+                            ? TextDecoration.lineThrough
+                            : null,
+                        color: task.status == 'completada'
+                            ? Colors.white38
+                            : Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
               ),
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    task.description,
-                    style: const TextStyle(color: Colors.white70, fontSize: 14),
-                  ),
-                  if (task.completionComment != null) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      task.completionComment!,
-                      style: TextStyle(
-                        color: isRejected
-                            ? Colors.redAccent
-                            : Colors.greenAccent,
-                        fontSize: 13,
-                        fontStyle: FontStyle.italic,
-                        fontWeight: isRejected
-                            ? FontWeight.bold
-                            : FontWeight.normal,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 4),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.access_time,
-                            size: 14,
-                            color: _getDateColor(task.dueDate),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            DateFormat('dd/MM/yyyy').format(task.dueDate),
-                            style: TextStyle(
-                              color: _getDateColor(task.dueDate),
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      _buildBadge(
-                        task.assignedToName.split('@')[0].toUpperCase(),
+                      _buildPriorityBadge(task.priority),
+                      const SizedBox(width: 8),
+                      Text(
+                        "Vence: ${DateFormat('dd/MM').format(task.dueDate)}",
+                        style: TextStyle(
+                          color: _getDateColor(task.dueDate),
+                          fontSize: 11,
+                        ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 8),
+                  Text(
+                    task.description,
+                    style: const TextStyle(color: Colors.white70, fontSize: 13),
+                  ),
+                  if (task.progressLogs.isNotEmpty &&
+                      task.status == 'pendiente')
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Text(
+                        "Último avance: ${task.progressLogs.last['msg']}",
+                        style: const TextStyle(
+                          color: Colors.blueAccent,
+                          fontSize: 12,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
                 ],
               ),
-              trailing: isBoss
-                  ? IconButton(
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isBoss) ...[
+                    IconButton(
                       icon: const Icon(
-                        Icons.delete_sweep_outlined,
-                        color: Colors.white30,
+                        Icons.picture_as_pdf,
+                        color: Colors.redAccent,
+                        size: 20,
                       ),
-                      onPressed: () => provider.deleteTask(task.id),
-                    )
-                  : null,
+                      onPressed: () =>
+                          ReportService.generateIndividualReport(task),
+                    ),
+                    IconButton(
+                      icon: Icon(
+                        Icons.push_pin,
+                        color: task.isPinned
+                            ? Colors.blueAccent
+                            : Colors.white24,
+                        size: 20,
+                      ),
+                      onPressed: () =>
+                          provider.togglePin(task.id, task.isPinned),
+                    ),
+                  ] else
+                    IconButton(
+                      icon: const Icon(
+                        Icons.add_comment_outlined,
+                        color: Colors.blueAccent,
+                        size: 20,
+                      ),
+                      onPressed: () => _showProgressDialog(context, provider),
+                    ),
+                ],
+              ),
             ),
             if (isBoss && task.status == 'revision')
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12, left: 15, right: 15),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Colors.redAccent),
-                        ),
-                        onPressed: () => _showRejectDialog(
-                          context,
-                          provider,
-                        ), // Diálogo con motivo
-                        icon: const Icon(
-                          Icons.close,
-                          color: Colors.redAccent,
-                          size: 18,
-                        ),
-                        label: const Text(
-                          "RECHAZAR",
-                          style: TextStyle(
-                            color: Colors.redAccent,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.greenAccent,
-                        ),
-                        onPressed: () => provider.approveTask(task.id),
-                        icon: const Icon(
-                          Icons.check,
-                          color: Colors.black,
-                          size: 18,
-                        ),
-                        label: const Text(
-                          "APROBAR",
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              _buildBossActions(context, provider),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildBadge(String label) {
+  Widget _buildPriorityBadge(TaskPriority priority) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: Colors.blueAccent,
-        borderRadius: BorderRadius.circular(5),
+        color: _getPriorityColor(priority).withOpacity(0.2),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: _getPriorityColor(priority).withOpacity(0.5)),
       ),
       child: Text(
-        label,
-        style: const TextStyle(
-          color: Colors.white,
+        priority.name.toUpperCase(),
+        style: TextStyle(
+          color: _getPriorityColor(priority),
           fontSize: 9,
-          fontWeight: FontWeight.w900,
+          fontWeight: FontWeight.bold,
         ),
+      ),
+    );
+  }
+
+  Widget _buildBossActions(BuildContext context, TaskProvider provider) {
+    return Padding(
+      padding: const EdgeInsets.all(12.0),
+      child: Row(
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              onPressed: () => _showRejectDialog(context, provider),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Colors.redAccent),
+              ),
+              child: const Text(
+                "RECHAZAR",
+                style: TextStyle(color: Colors.redAccent),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: ElevatedButton(
+              onPressed: () => provider.approveTask(task.id),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.greenAccent,
+              ),
+              child: const Text(
+                "APROBAR",
+                style: TextStyle(color: Colors.black),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

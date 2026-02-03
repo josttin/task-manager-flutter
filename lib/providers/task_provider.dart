@@ -22,28 +22,49 @@ class TaskProvider with ChangeNotifier {
     }
   }
 
+  // --- MODIFICADO: Ahora incluye Prioridad ---
   Future<void> addTask({
     required String title,
     required String description,
     required DateTime dueDate,
     required String assignedTo,
     required String assignedToName,
+    TaskPriority priority = TaskPriority.media, // Por defecto media
   }) async {
     if (_userData != null) {
-      await _dbService.addTask(
-        title: title,
-        description: description,
-        creatorUid: _userData!['uid'],
-        dueDate: dueDate,
-        assignedTo: assignedTo,
-        assignedToName: assignedToName,
-      );
+      await FirebaseFirestore.instance.collection('tasks').add({
+        "title": title,
+        "description": description,
+        "userId": _userData!['uid'],
+        "isDone": false,
+        "dueDate": Timestamp.fromDate(dueDate),
+        "assignedTo": assignedTo,
+        "assignedToName": assignedToName,
+        "status": 'pendiente',
+        "priority": priority.name, // 'baja', 'media', 'alta'
+        "isPinned": false,
+        "progressLogs": [],
+      });
     }
   }
 
-  // --- NUEVO: Flujo de Cierre y Revisión ---
+  // --- NUEVO: Gestión de Anclado (Pin) ---
+  Future<void> togglePin(String taskId, bool currentPinStatus) async {
+    await FirebaseFirestore.instance.collection('tasks').doc(taskId).update({
+      'isPinned': !currentPinStatus,
+    });
+  }
 
-  /// Llamado por el EMPLEADO para enviar la tarea a revisión
+  // --- NUEVO: Registrar Avances sin finalizar ---
+  Future<void> addTaskProgress(String taskId, String message) async {
+    final log = {'msg': message, 'date': Timestamp.now()};
+    await FirebaseFirestore.instance.collection('tasks').doc(taskId).update({
+      'progressLogs': FieldValue.arrayUnion([log]),
+    });
+  }
+
+  // --- Flujo de Cierre y Revisión ---
+
   Future<void> sendToReview(String taskId, String comment) async {
     await FirebaseFirestore.instance.collection('tasks').doc(taskId).update({
       'isDone': true,
@@ -53,25 +74,18 @@ class TaskProvider with ChangeNotifier {
     });
   }
 
-  /// Llamado por el JEFE para dar el visto bueno final
   Future<void> approveTask(String taskId) async {
     await FirebaseFirestore.instance.collection('tasks').doc(taskId).update({
       'status': 'completada',
     });
   }
 
-  /// Llamado por el JEFE para devolver la tarea con una razón
   Future<void> rejectTask(String taskId, String reason) async {
     await FirebaseFirestore.instance.collection('tasks').doc(taskId).update({
       'isDone': false,
       'status': 'pendiente',
-      'completionComment': 'RECHAZADO: $reason', // Guardamos el motivo aquí
+      'completionComment': 'RECHAZADO: $reason',
     });
-  }
-
-  // Mantenemos los métodos básicos
-  Future<void> toggleTask(TaskModel task) async {
-    await _dbService.updateTaskStatus(task.id, !task.isDone);
   }
 
   Future<void> deleteTask(String taskId) async {

@@ -5,6 +5,7 @@ import '../providers/task_provider.dart';
 import '../widgets/task_tile.dart';
 import '../services/auth_service.dart';
 import '../services/database_service.dart';
+import '../services/report_service.dart';
 import '../models/task_model.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -22,10 +23,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String _filter = 'Todas';
   String _searchQuery = '';
-
   DateTime? _selectedDate;
   String? _selectedEmployeeId;
   String? _selectedEmployeeName;
+  TaskPriority _selectedPriority = TaskPriority.media;
 
   @override
   void initState() {
@@ -33,6 +34,34 @@ class _HomeScreenState extends State<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<TaskProvider>(context, listen: false).loadUser(widget.uid);
     });
+  }
+
+  Color _getPriorityColor(TaskPriority priority) {
+    switch (priority) {
+      case TaskPriority.alta:
+        return Colors.redAccent;
+      case TaskPriority.media:
+        return Colors.orangeAccent;
+      case TaskPriority.baja:
+        return Colors.blueAccent;
+    }
+  }
+
+  // --- LÓGICA DE REPORTES CORREGIDA ---
+  void _handleGeneralReport(List<TaskModel> allTasks, bool isWeekly) {
+    final now = DateTime.now();
+    final filteredTasks = allTasks.where((t) {
+      final difference = now.difference(t.dueDate).inDays.abs();
+      return isWeekly ? difference <= 7 : difference <= 30;
+    }).toList();
+
+    // Se pasan los flags isWeekly e isMonthly para cumplir con las reglas del reporte
+    ReportService.generateGeneralReport(
+      filteredTasks,
+      isWeekly ? "REPORTE SEMANAL" : "REPORTE MENSUAL",
+      isWeekly: isWeekly,
+      isMonthly: !isWeekly,
+    );
   }
 
   void _showAddTaskSheet(TaskProvider provider) {
@@ -74,11 +103,45 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 25),
-                _buildModalField(
-                  _titleController,
-                  "Título de la tarea",
-                  Icons.title,
+                const Text(
+                  "Prioridad",
+                  style: TextStyle(color: Colors.white70, fontSize: 13),
                 ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: TaskPriority.values.map((p) {
+                    final isSelected = _selectedPriority == p;
+                    return GestureDetector(
+                      onTap: () => setModalState(() => _selectedPriority = p),
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 12),
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? _getPriorityColor(p).withOpacity(0.15)
+                              : Colors.transparent,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isSelected
+                                ? _getPriorityColor(p)
+                                : Colors.white10,
+                            width: 2,
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.bolt,
+                          color: isSelected
+                              ? _getPriorityColor(p)
+                              : Colors.white24,
+                          size: 26,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 25),
+                _buildModalField(_titleController, "Título", Icons.title),
                 const SizedBox(height: 15),
                 _buildModalField(
                   _descController,
@@ -132,6 +195,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       dueDate: _selectedDate ?? DateTime.now(),
                       assignedTo: _selectedEmployeeId!,
                       assignedToName: _selectedEmployeeName!,
+                      priority: _selectedPriority,
                     );
                     _titleController.clear();
                     _descController.clear();
@@ -157,14 +221,11 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final provider = Provider.of<TaskProvider>(context);
     final user = provider.userData;
-
     if (user == null)
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
     final String role = user['role'] ?? 'empleado';
-    final List<Color> bgColors = role == 'jefe'
-        ? [const Color(0xFF0D1B2A), const Color(0xFF1B263B)]
-        : [const Color(0xFF002117), const Color(0xFF004433)];
+    final bool isBoss = role == 'jefe';
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -179,13 +240,34 @@ class _HomeScreenState extends State<HomeScreen> {
         elevation: 0,
         backgroundColor: Colors.transparent,
         actions: [
+          if (isBoss) ...[
+            IconButton(
+              icon: const Icon(
+                Icons.calendar_view_week,
+                color: Colors.blueAccent,
+              ),
+              tooltip: "Reporte Semanal",
+              onPressed: () async {
+                final tasks = await provider.tasksStream.first;
+                _handleGeneralReport(tasks, true);
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.summarize, color: Colors.orangeAccent),
+              tooltip: "Reporte Mensual",
+              onPressed: () async {
+                final tasks = await provider.tasksStream.first;
+                _handleGeneralReport(tasks, false);
+              },
+            ),
+          ],
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
             onPressed: () => AuthService().signOut(),
           ),
         ],
       ),
-      floatingActionButton: role == 'jefe'
+      floatingActionButton: isBoss
           ? FloatingActionButton.extended(
               onPressed: () => _showAddTaskSheet(provider),
               backgroundColor: Colors.greenAccent,
@@ -206,7 +288,9 @@ class _HomeScreenState extends State<HomeScreen> {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: bgColors,
+                colors: isBoss
+                    ? [const Color(0xFF0D1B2A), const Color(0xFF1B263B)]
+                    : [const Color(0xFF002117), const Color(0xFF004433)],
               ),
             ),
           ),
@@ -242,15 +326,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildFilterSection(String role) {
-    // El jefe tiene el filtro de "Revisión" adicional
     List<String> filters = role == 'jefe'
         ? ['Todas', 'Pendientes', 'Revisión', 'Hechas']
         : ['Todas', 'Pendientes', 'Hechas'];
-
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: filters.map((f) {
           bool isSelected = _filter == f;
           return Padding(
@@ -283,7 +364,6 @@ class _HomeScreenState extends State<HomeScreen> {
       return const Center(
         child: CircularProgressIndicator(color: Colors.greenAccent),
       );
-
     var tasks = allTasks.where((t) {
       bool matchesSearch = t.title.toLowerCase().contains(_searchQuery);
       if (_filter == 'Todas') return matchesSearch;
@@ -293,15 +373,10 @@ class _HomeScreenState extends State<HomeScreen> {
       if (_filter == 'Hechas') return matchesSearch && t.status == 'completada';
       return matchesSearch;
     }).toList();
-
     if (tasks.isEmpty)
       return const Center(
-        child: Text(
-          "No hay tareas aquí",
-          style: TextStyle(color: Colors.white38),
-        ),
+        child: Text("No hay tareas", style: TextStyle(color: Colors.white38)),
       );
-
     return AnimationLimiter(
       child: ListView.builder(
         padding: const EdgeInsets.only(bottom: 100),
@@ -317,7 +392,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // --- MANTENEMOS LOS DEMÁS WIDGETS AUXILIARES (SearchBar, Progress, ModalField, etc) ---
   Widget _buildModalField(
     TextEditingController ctrl,
     String hint,
@@ -392,6 +466,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ?.map(
                     (e) => DropdownMenuItem(
                       value: e['uid'].toString(),
+                      onTap: () => _selectedEmployeeName = e['name'],
                       child: Text(
                         e['name'],
                         style: const TextStyle(
@@ -399,7 +474,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           fontSize: 13,
                         ),
                       ),
-                      onTap: () => _selectedEmployeeName = e['name'],
                     ),
                   )
                   .toList(),

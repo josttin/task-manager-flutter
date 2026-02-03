@@ -1,18 +1,24 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+enum TaskPriority { baja, media, alta }
+
 class TaskModel {
   final String id;
   final String title;
   final String description;
-  final String userId; // El ID del jefe que la creó
+  final String userId;
   final bool isDone;
   final DateTime dueDate;
-  final String assignedTo; // UID del empleado
+  final String assignedTo;
   final String assignedToName;
-  // Campos nuevos para el flujo de revisión gratuito
   final String? completionComment;
   final DateTime? completedAt;
-  final String status; // 'pendiente', 'revision', 'completada'
+  final String status;
+
+  // NUEVOS CAMPOS
+  final TaskPriority priority;
+  final bool isPinned;
+  final List<Map<String, dynamic>> progressLogs;
 
   TaskModel({
     required this.id,
@@ -25,11 +31,20 @@ class TaskModel {
     required this.assignedToName,
     this.completionComment,
     this.completedAt,
-    this.status = 'pendiente', // Valor por defecto
+    this.status = 'pendiente',
+    this.priority = TaskPriority.media,
+    this.isPinned = false,
+    this.progressLogs = const [],
   });
 
   factory TaskModel.fromSnapshot(DocumentSnapshot snap) {
     var data = snap.data() as Map<String, dynamic>;
+
+    // Mapeo de prioridad desde String a Enum
+    TaskPriority priorityEnum = TaskPriority.media;
+    if (data['priority'] == 'alta') priorityEnum = TaskPriority.alta;
+    if (data['priority'] == 'baja') priorityEnum = TaskPriority.baja;
+
     return TaskModel(
       id: snap.id,
       title: data['title'] ?? '',
@@ -46,6 +61,9 @@ class TaskModel {
           ? (data['completedAt'] as Timestamp).toDate()
           : null,
       status: data['status'] ?? 'pendiente',
+      priority: priorityEnum,
+      isPinned: data['isPinned'] ?? false,
+      progressLogs: List<Map<String, dynamic>>.from(data['progressLogs'] ?? []),
     );
   }
 
@@ -62,5 +80,8 @@ class TaskModel {
         ? Timestamp.fromDate(completedAt!)
         : null,
     "status": status,
+    "priority": priority.name, // Guarda 'baja', 'media' o 'alta'
+    "isPinned": isPinned,
+    "progressLogs": progressLogs,
   };
 }
