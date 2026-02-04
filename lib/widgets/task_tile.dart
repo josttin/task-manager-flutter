@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/task_model.dart';
 import '../providers/task_provider.dart';
-import '../services/report_service.dart'; // Importante
+import '../services/report_service.dart';
+import '../screens/TaskDetailScreen.dart';
 import 'package:intl/intl.dart';
 
 class TaskTile extends StatelessWidget {
@@ -136,129 +137,147 @@ class TaskTile extends StatelessWidget {
             width: task.isPinned ? 2 : 1,
           ),
         ),
-        child: Column(
-          children: [
-            ListTile(
-              contentPadding: const EdgeInsets.fromLTRB(15, 5, 5, 5),
-              leading: isBoss
-                  ? Icon(
-                      task.status == 'completada'
-                          ? Icons.check_circle
-                          : Icons.pending_actions,
-                      color: task.status == 'completada'
-                          ? Colors.greenAccent
-                          : Colors.orangeAccent,
-                    )
-                  : Checkbox(
-                      value: task.isDone,
-                      shape: const CircleBorder(),
-                      activeColor: Colors.greenAccent,
-                      onChanged: (val) {
-                        if (val == true && task.status == 'pendiente')
-                          _showCompletionDialog(context, provider);
-                      },
-                    ),
-              title: Row(
-                children: [
-                  if (task.isPinned)
-                    const Icon(
-                      Icons.push_pin,
-                      size: 16,
-                      color: Colors.blueAccent,
-                    ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      task.title,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        decoration: task.status == 'completada'
-                            ? TextDecoration.lineThrough
-                            : null,
+        child: InkWell(
+          // <--- Agregado para detectar el toque en toda la tarjeta
+          borderRadius: BorderRadius.circular(20),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => TaskDetailScreen(task: task),
+              ),
+            );
+          },
+          child: Column(
+            children: [
+              ListTile(
+                contentPadding: const EdgeInsets.fromLTRB(15, 5, 5, 5),
+                leading: isBoss
+                    ? Icon(
+                        task.status == 'completada'
+                            ? Icons.check_circle
+                            : Icons.pending_actions,
                         color: task.status == 'completada'
-                            ? Colors.white38
-                            : Colors.white,
+                            ? Colors.greenAccent
+                            : Colors.orangeAccent,
+                      )
+                    : Checkbox(
+                        value: task.isDone,
+                        shape: const CircleBorder(),
+                        activeColor: Colors.greenAccent,
+                        onChanged: (val) {
+                          if (val == true && task.status == 'pendiente') {
+                            _showCompletionDialog(context, provider);
+                          }
+                        },
                       ),
-                    ),
-                  ),
-                ],
-              ),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      _buildPriorityBadge(task.priority),
-                      const SizedBox(width: 8),
-                      Text(
-                        "Vence: ${DateFormat('dd/MM').format(task.dueDate)}",
-                        style: TextStyle(
-                          color: _getDateColor(task.dueDate),
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    task.description,
-                    style: const TextStyle(color: Colors.white70, fontSize: 13),
-                  ),
-                  if (task.progressLogs.isNotEmpty &&
-                      task.status == 'pendiente')
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8.0),
-                      child: Text(
-                        "Último avance: ${task.progressLogs.last['msg']}",
-                        style: const TextStyle(
-                          color: Colors.blueAccent,
-                          fontSize: 12,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (isBoss) ...[
-                    IconButton(
-                      icon: const Icon(
-                        Icons.picture_as_pdf,
-                        color: Colors.redAccent,
-                        size: 20,
-                      ),
-                      onPressed: () =>
-                          ReportService.generateIndividualReport(task),
-                    ),
-                    IconButton(
-                      icon: Icon(
+                title: Row(
+                  children: [
+                    if (task.isPinned)
+                      const Icon(
                         Icons.push_pin,
-                        color: task.isPinned
-                            ? Colors.blueAccent
-                            : Colors.white24,
-                        size: 20,
-                      ),
-                      onPressed: () =>
-                          provider.togglePin(task.id, task.isPinned),
-                    ),
-                  ] else
-                    IconButton(
-                      icon: const Icon(
-                        Icons.add_comment_outlined,
+                        size: 16,
                         color: Colors.blueAccent,
-                        size: 20,
                       ),
-                      onPressed: () => _showProgressDialog(context, provider),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        task.title,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          decoration: task.status == 'completada'
+                              ? TextDecoration.lineThrough
+                              : null,
+                          color: task.status == 'completada'
+                              ? Colors.white38
+                              : Colors.white,
+                        ),
+                      ),
                     ),
-                ],
+                  ],
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        _buildPriorityBadge(task.priority),
+                        const SizedBox(width: 8),
+                        Text(
+                          "Vence: ${DateFormat('dd/MM').format(task.dueDate)}",
+                          style: TextStyle(
+                            color: _getDateColor(task.dueDate),
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      task.description,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
+                      ),
+                    ),
+                    if (task.progressLogs.isNotEmpty &&
+                        task.status == 'pendiente')
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8.0),
+                        child: Text(
+                          "Último avance: ${task.progressLogs.last['msg']}",
+                          style: const TextStyle(
+                            color: Colors.blueAccent,
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isBoss) ...[
+                      IconButton(
+                        icon: const Icon(
+                          Icons.picture_as_pdf,
+                          color: Colors.redAccent,
+                          size: 20,
+                        ),
+                        onPressed: () =>
+                            ReportService.generateIndividualReport(task),
+                      ),
+                      IconButton(
+                        icon: Icon(
+                          Icons.push_pin,
+                          color: task.isPinned
+                              ? Colors.blueAccent
+                              : Colors.white24,
+                          size: 20,
+                        ),
+                        onPressed: () =>
+                            provider.togglePin(task.id, task.isPinned),
+                      ),
+                    ] else
+                      IconButton(
+                        icon: const Icon(
+                          Icons.add_comment_outlined,
+                          color: Colors.blueAccent,
+                          size: 20,
+                        ),
+                        onPressed: () => _showProgressDialog(context, provider),
+                      ),
+                  ],
+                ),
               ),
-            ),
-            if (isBoss && task.status == 'revision')
-              _buildBossActions(context, provider),
-          ],
+              if (isBoss && task.status == 'revision')
+                _buildBossActions(context, provider),
+            ],
+          ),
         ),
       ),
     );

@@ -14,6 +14,7 @@ class TaskModel {
   final String? completionComment;
   final DateTime? completedAt;
   final String status;
+  final String? evidenciaUrl;
 
   // NUEVOS CAMPOS
   final TaskPriority priority;
@@ -35,6 +36,7 @@ class TaskModel {
     this.priority = TaskPriority.media,
     this.isPinned = false,
     this.progressLogs = const [],
+    this.evidenciaUrl,
   });
 
   factory TaskModel.fromSnapshot(DocumentSnapshot snap) {
@@ -64,6 +66,7 @@ class TaskModel {
       priority: priorityEnum,
       isPinned: data['isPinned'] ?? false,
       progressLogs: List<Map<String, dynamic>>.from(data['progressLogs'] ?? []),
+      evidenciaUrl: data['evidenciaUrl'],
     );
   }
 
@@ -83,5 +86,6 @@ class TaskModel {
     "priority": priority.name, // Guarda 'baja', 'media' o 'alta'
     "isPinned": isPinned,
     "progressLogs": progressLogs,
+    'evidenciaUrl': evidenciaUrl,
   };
 }

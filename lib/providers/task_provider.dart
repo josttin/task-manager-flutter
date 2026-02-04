@@ -22,14 +22,13 @@ class TaskProvider with ChangeNotifier {
     }
   }
 
-  // --- MODIFICADO: Ahora incluye Prioridad ---
   Future<void> addTask({
     required String title,
     required String description,
     required DateTime dueDate,
     required String assignedTo,
     required String assignedToName,
-    TaskPriority priority = TaskPriority.media, // Por defecto media
+    TaskPriority priority = TaskPriority.media,
   }) async {
     if (_userData != null) {
       await FirebaseFirestore.instance.collection('tasks').add({
@@ -41,21 +40,19 @@ class TaskProvider with ChangeNotifier {
         "assignedTo": assignedTo,
         "assignedToName": assignedToName,
         "status": 'pendiente',
-        "priority": priority.name, // 'baja', 'media', 'alta'
+        "priority": priority.name,
         "isPinned": false,
         "progressLogs": [],
       });
     }
   }
 
-  // --- NUEVO: Gestión de Anclado (Pin) ---
   Future<void> togglePin(String taskId, bool currentPinStatus) async {
     await FirebaseFirestore.instance.collection('tasks').doc(taskId).update({
       'isPinned': !currentPinStatus,
     });
   }
 
-  // --- NUEVO: Registrar Avances sin finalizar ---
   Future<void> addTaskProgress(String taskId, String message) async {
     final log = {'msg': message, 'date': Timestamp.now()};
     await FirebaseFirestore.instance.collection('tasks').doc(taskId).update({
@@ -63,8 +60,17 @@ class TaskProvider with ChangeNotifier {
     });
   }
 
+  // --- CORREGIDO: Solo guarda la URL, no finaliza la tarea ---
+  Future<void> addEvidencia(String taskId, String imageUrl) async {
+    await FirebaseFirestore.instance.collection('tasks').doc(taskId).update({
+      'evidenciaUrl': imageUrl,
+      // Quitamos isDone y status de aquí para permitir subir fotos sin cerrar la tarea
+    });
+  }
+
   // --- Flujo de Cierre y Revisión ---
 
+  // Este es el método que realmente marca la tarea como terminada
   Future<void> sendToReview(String taskId, String comment) async {
     await FirebaseFirestore.instance.collection('tasks').doc(taskId).update({
       'isDone': true,
@@ -77,14 +83,19 @@ class TaskProvider with ChangeNotifier {
   Future<void> approveTask(String taskId) async {
     await FirebaseFirestore.instance.collection('tasks').doc(taskId).update({
       'status': 'completada',
+      'isDone': true, // Se mantiene en true para el reporte individual
+      'approvedAt': Timestamp.now(),
     });
   }
 
   Future<void> rejectTask(String taskId, String reason) async {
     await FirebaseFirestore.instance.collection('tasks').doc(taskId).update({
-      'isDone': false,
+      'isDone':
+          false, // Vuelve a false para que no salga en reportes de "terminadas"
       'status': 'pendiente',
-      'completionComment': 'RECHAZADO: $reason',
+      'progressLogs': FieldValue.arrayUnion([
+        {'msg': 'RECHAZADO POR JEFE: $reason', 'date': Timestamp.now()},
+      ]),
     });
   }
 

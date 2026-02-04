@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/task_model.dart';
+import '../models/comment_model.dart';
 
 class DatabaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -108,5 +109,29 @@ class DatabaseService {
 
   Future<void> deleteTask(String taskId) async {
     await _db.collection('tasks').doc(taskId).delete();
+  }
+
+  // Obtener stream de comentarios de una tarea específica
+  Stream<List<CommentModel>> getComments(String taskId) {
+    return _db
+        .collection('tasks')
+        .doc(taskId)
+        .collection('comments')
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => CommentModel.fromFirestore(doc))
+              .toList(),
+        );
+  }
+
+  // Enviar un comentario
+  Future<void> addComment(String taskId, CommentModel comment) async {
+    await _db
+        .collection('tasks')
+        .doc(taskId)
+        .collection('comments')
+        .add(comment.toMap());
   }
 }
